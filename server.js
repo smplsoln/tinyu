@@ -22,6 +22,11 @@ const RESOURCES = {
 
 };
 
+const urlDbObj = {
+  "b2xVn2": "http://www.lighthouselabs.ca",
+  "9sm5xK": "http://www.google.com"
+};
+
 // Init Express app
 const app = express();
 
@@ -36,7 +41,7 @@ app.get(APP_URLS.home, (req, res) => {
 });
 
 app.get(APP_URLS.urls, (req, res) => {
-  res.status(HTTP_STATUS.GET_OK).send(`TinyU URLs: "${req.url}"`);
+  res.status(HTTP_STATUS.GET_OK).send(`TinyU URLs: "${urlDbObj}"`);
 });
 
 
@@ -49,5 +54,5 @@ app.get(APP_URLS.catch_all, (req, res) => {
 
 // start app webserver
 app.listen(SERVER_PORT, () => {
-  console.log(`app is listening on SERVER_PORT ${SERVER_PORT}`);
+  console.log(`TinyU app is listening on SERVER_PORT ${SERVER_PORT}`);
 });
