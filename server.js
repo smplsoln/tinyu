@@ -41,7 +41,8 @@ app.get(APP_URLS.home, (req, res) => {
 });
 
 app.get(APP_URLS.urls, (req, res) => {
-  res.status(HTTP_STATUS.GET_OK).send(`TinyU URLs: "${urlDbObj}"`);
+  // res.status(HTTP_STATUS.GET_OK).send(`TinyU URLs: "${JSON.stringify(urlDbObj)}"`);
+  res.status(HTTP_STATUS.GET_OK).json(urlDbObj);
 });
 
 
