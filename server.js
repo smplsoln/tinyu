@@ -12,6 +12,7 @@ const HTTP_STATUS = {
 const APP_URLS = {
   home: '/',
   urls: '/urls',
+  shortUrl: '/urls/:shortURL',
   favicon: '/favicon.ico',
 
   catchAll: '*'
@@ -45,9 +46,18 @@ app.get(APP_URLS.home, (req, res) => {
 
 app.get(APP_URLS.urls, (req, res) => {
   // res.status(HTTP_STATUS.GET_OK).send(`TinyU URLs: "${JSON.stringify(urlDbObj)}"`);
-  res.status(HTTP_STATUS.GET_OK).json(urlDbObj);
+  // res.status(HTTP_STATUS.GET_OK).json(urlDbObj);
+  const templateVars = { urls: urlDbObj };
+  res.render("urls_index", templateVars);
 });
 
+app.get(APP_URLS.shortUrl, (req, res) => {
+  const templateVars = {
+    shortURL: req.params.shortURL,
+    longURL: `${urlDbObj[req.params.shortURL]}`
+  };
+  res.render("urls_show", templateVars);
+});
 
 
 // catch-all for unknown resource links
