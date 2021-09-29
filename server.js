@@ -16,6 +16,7 @@ const APP_URLS = {
   urls: '/urls',
   shortUrl: '/urls/:shortURL',
   urlsNew: "/urls/new",
+  uShortURL: "/u/:shortURL",
   favicon: '/favicon.ico',
 
   catchAll: '*'
@@ -62,8 +63,8 @@ app.get(APP_URLS.home, (req, res) => {
 app.get(APP_URLS.urls, (req, res) => {
   // res.status(HTTP_STATUS.GET_OK).send(`TinyU URLs: "${JSON.stringify(urlDbObj)}"`);
   // res.status(HTTP_STATUS.GET_OK).json(urlDbObj);
-  const templatelets = { urls: urlDbObj };
-  res.render("urls_index", templatelets);
+  const templateVars = { urls: urlDbObj };
+  res.render("urls_index", templateVars);
 });
 
 app.get(APP_URLS.urlsNew, (req, res) => {
@@ -73,19 +74,26 @@ app.get(APP_URLS.urlsNew, (req, res) => {
 app.post(APP_URLS.urls, (req, res) => {
   let rndmStrId = generateRandomString(RANDOM_STR_LENGTH);
   urlDbObj[rndmStrId] = req.body.longURL;
-  res.send("ok");
+  let shortURL = APP_URLS.urls + '/' + rndmStrId;
+  res.redirect(HTTP_STATUS.REDIRECT, shortURL);
 });
 
 // /url/:id here
 app.get(APP_URLS.shortUrl, (req, res) => {
-  const templatelets = {
+  const templateVars = {
     shortURL: req.params.shortURL,
     longURL: `${urlDbObj[req.params.shortURL]}`
   };
-  res.render("urls_show", templatelets);
+  res.render("urls_show", templateVars);
 });
 
-
+app.get(APP_URLS.uShortURL, (req, res) => {
+  let longURL = urlDbObj[req.params.shortURL];
+  if (!longURL) {
+    longURL = APP_URLS.home;
+  }
+  res.redirect(longURL);
+});
 
 // catch-all for unknown resource links
 app.get(APP_URLS.catchAll, (req, res) => {
