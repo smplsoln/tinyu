@@ -1,6 +1,6 @@
 // module imports
 const express = require('express');
-const path = require('path');
+// const path = require('path');
 const favicon = require('serve-favicon');
 const morgan = require('morgan');
 // CONSTANTS
@@ -14,7 +14,7 @@ const APP_URLS = {
   urls: '/urls',
   favicon: '/favicon.ico',
 
-  catch_all: '*'
+  catchAll: '*'
 };
 
 const RESOURCES = {
@@ -48,7 +48,7 @@ app.get(APP_URLS.urls, (req, res) => {
 
 
 // catch-all for unknown resource links
-app.get(APP_URLS.catch_all, (req, res) => {
+app.get(APP_URLS.catchAll, (req, res) => {
   res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.home);
   // res.redirect(APP_URLS.home);
 });
