@@ -30,6 +30,9 @@ const urlDbObj = {
 // Init Express app
 const app = express();
 
+// Set ejs as view engine
+app.set('view engine', 'ejs');
+
 // middleware inits
 app.use(favicon(RESOURCES.favicon));
 app.use(express.urlencoded({ extended: false }));
