@@ -3,16 +3,20 @@ const express = require('express');
 // const path = require('path');
 const favicon = require('serve-favicon');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 
 // CONSTANTS
 const RANDOM_STR_LENGTH = 6;
 const SERVER_PORT = 3000;
 const HTTP_STATUS = {
   GET_OK: 200,
+  CREATED: 201,
   REDIRECT: 302
 };
 const APP_URLS = {
   home: '/',
+  login: '/login',
+  logout: '/logout',
   urls: '/urls',
   shortUrl: '/urls/:shortURL',
   urlsNew: "/urls/new",
@@ -53,23 +57,49 @@ app.set('view engine', 'ejs');
 
 // middleware inits
 app.use(favicon(RESOURCES.favicon));
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
-// resource-handler mappings
-app.get(APP_URLS.home, (req, res) => {
-  res.status(HTTP_STATUS.GET_OK).send(`Thanks for visiting TinyU "${req.url}"`);
+// response-handler mappings
+
+// process login and set username cookie
+app.post(APP_URLS.login, (req, res) => {
+  let uname = req.body.username;
+  res.status(HTTP_STATUS.CREATED)
+    .cookie('username', uname)
+    .redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
 });
 
+// process logout and set username cookie
+app.post(APP_URLS.logout, (req, res) => {
+  res.status(HTTP_STATUS.CREATED)
+    .clearCookie('username')
+    .redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
+});
+
+// GET /home handler
+app.get(APP_URLS.home, (req, res) => {
+  res.status(HTTP_STATUS.GET_OK)
+    .send(`Thanks for visiting TinyU "${req.url}"`);
+});
+
+// GET /urls
 app.get(APP_URLS.urls, (req, res) => {
   // res.status(HTTP_STATUS.GET_OK).send(`TinyU URLs: "${JSON.stringify(urlDbObj)}"`);
   // res.status(HTTP_STATUS.GET_OK).json(urlDbObj);
-  const templateVars = { urls: urlDbObj };
+  const templateVars = {
+    urls: urlDbObj,
+    username: req.cookies["username"]
+  };
   res.render("urls_index", templateVars);
 });
 
 app.get(APP_URLS.urlsNew, (req, res) => {
-  res.render("urls_new");
+  const templateVars = {
+    username: req.cookies["username"]
+  };
+  res.render("urls_new", templateVars);
 });
 
 // POST : Add a new URL entry
@@ -100,7 +130,8 @@ app.post(APP_URLS.deleteUrl, (req, res) => {
 app.get(APP_URLS.shortUrl, (req, res) => {
   const templateVars = {
     shortURL: req.params.shortURL,
-    longURL: `${urlDbObj[req.params.shortURL]}`
+    longURL: `${urlDbObj[req.params.shortURL]}`,
+    username: req.cookies["username"]
   };
   res.render("urls_show", templateVars);
 });
