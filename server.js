@@ -34,9 +34,9 @@ const urlDbObj = {
 
 // Generate random string
 const generateRandomString = (strLen) => {
-  let rndmStr = '';
   let charSet = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let charSetLen = charSet.length;
+  let rndmStr = '';
   for (let i = 0; i < strLen; i++) {
     rndmStr += charSet.charAt(Math.floor(Math.random() *
       charSetLen));
