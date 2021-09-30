@@ -16,6 +16,7 @@ const APP_URLS = {
   urls: '/urls',
   shortUrl: '/urls/:shortURL',
   urlsNew: "/urls/new",
+  deleteUrl: "/urls/:shortURL/delete",
   uShortURL: "/u/:shortURL",
   favicon: '/favicon.ico',
 
@@ -71,6 +72,7 @@ app.get(APP_URLS.urlsNew, (req, res) => {
   res.render("urls_new");
 });
 
+// POST : Add a new URL entry
 app.post(APP_URLS.urls, (req, res) => {
   let rndmStrId = generateRandomString(RANDOM_STR_LENGTH);
   urlDbObj[rndmStrId] = req.body.longURL;
@@ -78,7 +80,23 @@ app.post(APP_URLS.urls, (req, res) => {
   res.redirect(HTTP_STATUS.REDIRECT, shortURL);
 });
 
-// /url/:id here
+//POST /urls/:shortURL : Update the long url of a given short url
+app.post(APP_URLS.shortUrl, (req, res) => {
+  let surl = req.params.shortURL;
+  urlDbObj[surl] = req.body.longURL;
+  let shortURL = APP_URLS.urls + '/' + surl;
+  res.redirect(HTTP_STATUS.REDIRECT, shortURL);
+});
+
+//DELETE a url entry having given shortURL
+app.post(APP_URLS.deleteUrl, (req, res) => {
+  let surl = req.params.shortURL;
+  delete urlDbObj[surl];
+  res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
+});
+
+
+// /urls/:id show the longURL details for the given shortURL
 app.get(APP_URLS.shortUrl, (req, res) => {
   const templateVars = {
     shortURL: req.params.shortURL,
@@ -87,6 +105,7 @@ app.get(APP_URLS.shortUrl, (req, res) => {
   res.render("urls_show", templateVars);
 });
 
+// redirect to the longURL for the given shortURL
 app.get(APP_URLS.uShortURL, (req, res) => {
   let longURL = urlDbObj[req.params.shortURL];
   if (!longURL) {
