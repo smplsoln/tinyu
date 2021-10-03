@@ -8,14 +8,23 @@ const cookieParser = require('cookie-parser');
 // CONSTANTS
 const RANDOM_STR_LENGTH = 6;
 const SERVER_PORT = 3000;
+const USER_ID = 'user_id';
+const COOKIES = {
+  USER_ID: USER_ID
+};
 const HTTP_STATUS = {
   GET_OK: 200,
   CREATED: 201,
-  REDIRECT: 302
+  ACCEPTED: 202,
+  REDIRECT: 302,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403
 };
 const APP_URLS = {
   home: '/',
   login: '/login',
+  register: '/register',
   logout: '/logout',
   urls: '/urls',
   shortUrl: '/urls/:shortURL',
@@ -28,8 +37,22 @@ const APP_URLS = {
 };
 
 const RESOURCES = {
-  favicon: './resources/favicon/favicon.ico'
+  favicon: './public/images/favicon.ico'
+};
 
+const users = {
+  "userId1": {
+    id: "userId1",
+    name: "Iron Man",
+    email: "user1@example.com",
+    password: "123"
+  },
+  "userId2": {
+    id: "userId2",
+    name: "Black Widow",
+    email: "user2@example.com",
+    password: "234"
+  }
 };
 
 const urlDbObj = {
@@ -43,38 +66,112 @@ const generateRandomString = (strLen) => {
   let charSetLen = charSet.length;
   let rndmStr = '';
   for (let i = 0; i < strLen; i++) {
-    rndmStr += charSet.charAt(Math.floor(Math.random() *
-      charSetLen));
+    rndmStr += charSet.charAt(Math.floor(Math.random() * charSetLen));
   }
   return rndmStr;
 };
 
+const getUserForEmail = (emailAddr) => {
+  for (const uid of Object.keys(users)) {
+    if (users[uid].email === emailAddr) {
+      return users[uid];
+    }
+  }
+  return false;
+};
+
 // Init Express app
 const app = express();
+app.use(favicon(RESOURCES.favicon));
+app.use(express.static('public'));
+app.use(morgan('dev'));
 
 // Set ejs as view engine
 app.set('view engine', 'ejs');
 
 // middleware inits
-app.use(favicon(RESOURCES.favicon));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan('dev'));
 
 // response-handler mappings
 
-// process login and set username cookie
+// register new user
+app.get(APP_URLS.register, (req, res) => {
+  res.render('register');
+});
+
+app.post(APP_URLS.register, (req, res) => {
+
+  const body = req.body;
+  const email = body.email;
+  const password = body.password;
+  const name = body.name;
+
+  // check name, email and password was submitted
+  if (!email || !password || !name) {
+    return res.status(HTTP_STATUS.BAD_REQUEST)
+      .send('Name, email and password cannot be blank!');
+  }
+
+  // Check if user already exists for this email
+  if (getUserForEmail(email)) {
+    return res.redirect(HTTP_STATUS.FORBIDDEN, APP_URLS.register);
+  }
+
+  // add new user
+  const newUserId = generateRandomString(3);
+  users[newUserId] = {
+    id: newUserId,
+    name: name,
+    email: email,
+    password: password
+  };
+
+  res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.login);
+});
+
+// Login
+app.get(APP_URLS.login, (req, res) => {
+  res.render('login');
+});
+
+// process login and set user_id cookie
 app.post(APP_URLS.login, (req, res) => {
-  let uname = req.body.username;
-  res.status(HTTP_STATUS.CREATED)
-    .cookie('username', uname)
+
+  const body = req.body;
+  console.log(req.body);
+
+  const email = body.email;
+  const password = body.password;
+
+  // check email and password was submitted
+  if (!email || !password) {
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .send('email and password cannot be blank');
+  }
+
+  // get the user info for this email
+  let user = getUserForEmail(email);
+
+  // no  user with this email address
+  if (!user) {
+    return res.redirect(HTTP_STATUS.FORBIDDEN, APP_URLS.login);
+  }
+
+  // password does not match
+  if (user.password !== password) {
+    return res.redirect(HTTP_STATUS.FORBIDDEN, APP_URLS.login);
+  }
+
+  // User authenticated successfully
+  res.cookie(COOKIES.USER_ID, user.id)
     .redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
 });
 
 // process logout and set username cookie
 app.post(APP_URLS.logout, (req, res) => {
   res.status(HTTP_STATUS.CREATED)
-    .clearCookie('username')
+    .clearCookie(COOKIES.USER_ID)
     .redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
 });
 
@@ -88,22 +185,68 @@ app.get(APP_URLS.home, (req, res) => {
 app.get(APP_URLS.urls, (req, res) => {
   // res.status(HTTP_STATUS.GET_OK).send(`TinyU URLs: "${JSON.stringify(urlDbObj)}"`);
   // res.status(HTTP_STATUS.GET_OK).json(urlDbObj);
+
+  const userId = req.cookies[COOKIES.USER_ID];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!userId) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
+  const user = users[userId];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!user) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
   const templateVars = {
     urls: urlDbObj,
-    username: req.cookies["username"]
+    username: user.name
   };
   res.render("urls_index", templateVars);
 });
 
 app.get(APP_URLS.urlsNew, (req, res) => {
+  const userId = req.cookies[COOKIES.USER_ID];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!userId) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
+  const user = users[userId];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!user) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
   const templateVars = {
-    username: req.cookies["username"]
+    urls: urlDbObj,
+    username: user.name
   };
+
   res.render("urls_new", templateVars);
 });
 
 // POST : Add a new URL entry
 app.post(APP_URLS.urls, (req, res) => {
+
+  const userId = req.cookies[COOKIES.USER_ID];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!userId) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
+  const user = users[userId];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!user) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
   let rndmStrId = generateRandomString(RANDOM_STR_LENGTH);
   urlDbObj[rndmStrId] = req.body.longURL;
   let shortURL = APP_URLS.urls + '/' + rndmStrId;
@@ -112,6 +255,19 @@ app.post(APP_URLS.urls, (req, res) => {
 
 //POST /urls/:shortURL : Update the long url of a given short url
 app.post(APP_URLS.shortUrl, (req, res) => {
+  const userId = req.cookies[COOKIES.USER_ID];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!userId) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
+  const user = users[userId];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!user) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
   let surl = req.params.shortURL;
   urlDbObj[surl] = req.body.longURL;
   let shortURL = APP_URLS.urls + '/' + surl;
@@ -120,6 +276,19 @@ app.post(APP_URLS.shortUrl, (req, res) => {
 
 //DELETE a url entry having given shortURL
 app.post(APP_URLS.deleteUrl, (req, res) => {
+  const userId = req.cookies[COOKIES.USER_ID];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!userId) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
+  const user = users[userId];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!user) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
   let surl = req.params.shortURL;
   delete urlDbObj[surl];
   res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
@@ -128,10 +297,24 @@ app.post(APP_URLS.deleteUrl, (req, res) => {
 
 // /urls/:id show the longURL details for the given shortURL
 app.get(APP_URLS.shortUrl, (req, res) => {
+  const userId = req.cookies[COOKIES.USER_ID];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!userId) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
+  const user = users[userId];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!user) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
   const templateVars = {
     shortURL: req.params.shortURL,
     longURL: `${urlDbObj[req.params.shortURL]}`,
-    username: req.cookies["username"]
+    username: user.name
   };
   res.render("urls_show", templateVars);
 });
