@@ -32,7 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 const validateLoginSession = (req, res) => {
   const userId = req.session.userId;
   // if the userId cookie is not already set
-  // then the usser is not authenticated
+  // then the user is not authenticated
   if (!userId) {
     req.session = null;
     return res.status(HTTP_STATUS.FORBIDDEN)
@@ -41,7 +41,7 @@ const validateLoginSession = (req, res) => {
 
   const user = users[userId];
   // if the userId cookie is not already set
-  // then the usser is not authenticated
+  // then the user is not authenticated
   if (!user) {
     req.session = null;
     return res.status(HTTP_STATUS.FORBIDDEN)
@@ -55,8 +55,32 @@ const validateLoginSession = (req, res) => {
 
 // register new user
 app.get(APP_URLS.register, (req, res) => {
-  res.status(HTTP_STATUS.OK)
-    .render('register', {err: ""});
+
+  // validate the current user session
+  const userId = req.session.userId;
+  if (!userId) {
+    // userid not set in session
+    // so send registration page
+    return res.status(HTTP_STATUS.OK)
+      .render('register', {err: ""});
+  }
+  // if the userId cookie is not already set
+  // then the user might already exist
+  // and in a currently authenticated session
+  const user = users[userId];
+  if (!user) {
+    // no user exists for this session
+    // userid so send registration page
+    // after clearing the session data
+    req.session = null;
+    return res.status(HTTP_STATUS.OK)
+      .render('register', {err: ""});
+  }
+
+  // valid session of existing registered user detected
+  // so redireect to urls page
+  res.status(HTTP_STATUS.REDIRECT)
+    .redirect(APP_URLS.urls);
 });
 
 app.post(APP_URLS.register, (req, res) => {
@@ -105,8 +129,32 @@ app.post(APP_URLS.register, (req, res) => {
 
 // Login
 app.get(APP_URLS.login, (req, res) => {
-  res.status(HTTP_STATUS.OK)
-    .render('login', {err: ""});
+
+  // validate the current user session
+  const userId = req.session.userId;
+  if (!userId) {
+    // userid not set in session
+    // so send login page
+    return res.status(HTTP_STATUS.OK)
+      .render('login', {err: ""});
+  }
+  // if the userId cookie is not already set
+  // then the user might already exist
+  // and in a currently authenticated session
+  const user = users[userId];
+  if (!user) {
+    // no user exists for this session
+    // userid so send login page
+    // after clearing the session data
+    req.session = null;
+    return res.status(HTTP_STATUS.OK)
+      .render('login', {err: ""});
+  }
+
+  // valid session os existing registered user detected
+  // so redireect to urls page
+  res.status(HTTP_STATUS.REDIRECT)
+    .redirect(APP_URLS.urls);
 });
 
 // process login and set user_id cookie
@@ -402,7 +450,14 @@ app.post(APP_URLS.deleteUrl, (req, res) => {
 
 // redirect to the longURL for the given shortURL
 app.get(APP_URLS.uShortURL, (req, res) => {
-  let longURL = `${urlDbObj[req.params.shortURL].longURL}`;
+  const shortURL = req.params.shortURL;
+  const urlObj = urlDbObj[shortURL];
+  if (!urlObj) {
+    req.session = null;
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .render('login', { err: 'Error: URL not found!' });
+  }
+  let longURL = `${urlObj.longURL}`;
   if (!longURL) {
     longURL = APP_URLS.home;
   }
