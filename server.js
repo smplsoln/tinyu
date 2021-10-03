@@ -34,6 +34,7 @@ const validateLoginSession = (req, res) => {
   // if the userId cookie is not already set
   // then the usser is not authenticated
   if (!userId) {
+    req.session = null;
     return res.status(HTTP_STATUS.FORBIDDEN)
       .render('login', { err: 'Error: Not logged in!' });
   }
@@ -42,6 +43,7 @@ const validateLoginSession = (req, res) => {
   // if the userId cookie is not already set
   // then the usser is not authenticated
   if (!user) {
+    req.session = null;
     return res.status(HTTP_STATUS.FORBIDDEN)
       .render('login', { err: 'Error: Not logged in!' });
   }
@@ -94,6 +96,7 @@ app.post(APP_URLS.register, (req, res) => {
         password: hash
       };
 
+      req.session = null;
       res.status(HTTP_STATUS.ACCEPTED)
         .render('login', {err: ""});
     });
@@ -115,6 +118,7 @@ app.post(APP_URLS.login, (req, res) => {
 
   // check email and password was submitted
   if (!email || !password) {
+    req.session = null;
     return res.status(HTTP_STATUS.FORBIDDEN)
       .render('login', { err: 'Error: Email and password cannot be blank!' });
   }
@@ -124,6 +128,7 @@ app.post(APP_URLS.login, (req, res) => {
 
   // no user with this email address
   if (!user) {
+    req.session = null;
     // Purposefully keeping the error message brief and generic for safety
     return res.status(HTTP_STATUS.FORBIDDEN)
       .render('login', { err: 'Error: Invalid email or password!' });
@@ -132,6 +137,7 @@ app.post(APP_URLS.login, (req, res) => {
   // compare the stored password hash with the user provided password
   bcrypt.compare(password, user.password, (err, result) => {
     if (!result) {
+      req.session = null;
       // password does not match
       return res.status(HTTP_STATUS.FORBIDDEN)
         .render('login', { err: 'Error: Email and password should be correct!' });
@@ -141,6 +147,7 @@ app.post(APP_URLS.login, (req, res) => {
       // Such error during bcrypt is never expected
       // So logging the error, but not sending it to user for safety
       console.error({err});
+      req.session = null;
       return res.status(HTTP_STATUS.FORBIDDEN)
         .render('login', { err: 'Error during authentication!' });
     }
@@ -274,7 +281,43 @@ app.post(APP_URLS.urls, (req, res) => {
   res.redirect(HTTP_STATUS.REDIRECT, shortURL);
 });
 
-//POST /urls/:shortURL : Update the long url of a given short url
+// GET /urls/:shortURL show the longURL details for the given shortURL
+app.get(APP_URLS.shortUrl, (req, res) => {
+  // validate the current user session
+  if (validateLoginSession(req, res) !== true) {
+    // response is alredy sent in case of error
+    // else true is returned, so this is a
+    // precautionary return in case of false
+    return;
+  }
+  const userId = req.session.userId;
+  const user = users[userId];
+
+  const shortURL = req.params.shortURL;
+  const urlObj = urlDbObj[shortURL];
+  if (!urlObj) {
+    req.session = null;
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .render('login', { err: 'Error: URL not found!' });
+  }
+  if (urlObj.userId !== userId) {
+    req.session = null;
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .render('login', { err: 'Error: URL does not belong to user!' });
+  }
+
+  const username = `${user.name} (${user.email})`;
+  const templateVars = {
+    shortURL: shortURL,
+    longURL: urlObj.longURL,
+    username: username,
+    err: ""
+  };
+  res.status(HTTP_STATUS.OK)
+    .render("urls_show", templateVars);
+});
+
+// POST /urls/:shortURL : Update the long url of a given short url
 app.post(APP_URLS.shortUrl, (req, res) => {
 
   // validate the current user session
@@ -295,6 +338,7 @@ app.post(APP_URLS.shortUrl, (req, res) => {
   // ask the user to login properly
   // posibility of impersonation
   if (!urlObj || urlObj.userId !== userId) {
+    req.session = null;
     return res.status(HTTP_STATUS.FORBIDDEN)
       .render('login', { err: 'Error: Invalid user information!' });
   }
@@ -317,7 +361,7 @@ app.post(APP_URLS.shortUrl, (req, res) => {
   res.redirect(HTTP_STATUS.REDIRECT, shortURL);
 });
 
-//DELETE a url entry having given shortURL
+// DELETE a url entry having given shortURL
 app.post(APP_URLS.deleteUrl, (req, res) => {
   // validate the current user session
   if (validateLoginSession(req, res) !== true) {
@@ -329,10 +373,16 @@ app.post(APP_URLS.deleteUrl, (req, res) => {
   const userId = req.session.userId;
   const user = users[userId];
   let surl = req.params.shortURL;
+  const urlObj = urlDbObj[surl];
+  if (!urlObj) {
+    req.session = null;
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .render('login', { err: 'Error: URL not found!' });
+  }
 
   // The current user doesnt own this url entry
   // so show error and redirect to
-  if (userId !== urlDbObj[surl].userId) {
+  if (userId !== urlObj.userId) {
     // Render the urls table
     const urlsForUser = getUrlsForUserId(userId, urlDbObj);
     const username = `${user.name} (${user.email})`;
@@ -348,30 +398,6 @@ app.post(APP_URLS.deleteUrl, (req, res) => {
   // All good, delete the url
   delete urlDbObj[surl];
   res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
-});
-
-
-// /urls/:id show the longURL details for the given shortURL
-app.get(APP_URLS.shortUrl, (req, res) => {
-  const userId = req.session.userId;
-  const user = users[userId];
-
-  const shortURL = req.params.shortURL;
-  const urlObj = urlDbObj[shortURL];
-  if (urlObj.userId !== userId) {
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render('login', { err: 'Error: URL does not belong to user!' });
-  }
-
-  const username = `${user.name} (${user.email})`;
-  const templateVars = {
-    shortURL: shortURL,
-    longURL: urlObj.longURL,
-    username: username,
-    err: ""
-  };
-  res.status(HTTP_STATUS.OK)
-    .render("urls_show", templateVars);
 });
 
 // redirect to the longURL for the given shortURL
