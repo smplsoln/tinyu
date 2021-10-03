@@ -209,8 +209,17 @@ app.get(APP_URLS.urls, (req, res) => {
     return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
   }
 
+  const urlsForUser = {};
+
+  for (const short of Object.keys(urlDbObj)) {
+    const urlObj = urlDbObj[short];
+    if (urlObj.userId === userId) {
+      urlsForUser[short] = urlObj;
+    }
+  }
+
   const templateVars = {
-    urls: urlDbObj,
+    urls: urlsForUser,
     username: user.name
   };
   res.render("urls_index", templateVars);
