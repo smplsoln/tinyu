@@ -21,7 +21,7 @@
   </div>
   <div class="card text-center">
     <div class="card-body">
-      <form class="form-inline justify-content-center" action="/urls/<%= shortURL %>" method="POST">
+      <form class="form-inline justify-content-center" action="/urls/<%= shortURL %>?_method=PUT" method="POST">
         <div class="form-group mb-2">
           <% if (err.length > 0) { %>
             <h5 class="card-title">Please provide valid URL to update</h5>

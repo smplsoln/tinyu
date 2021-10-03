@@ -8,25 +8,29 @@ const favicon = require('serve-favicon');
 const morgan = require('morgan');
 const bcrypt = require('bcryptjs');
 const cookieSession = require('cookie-session');
+const methodOverride = require('method-override');
+
 const { generateRandomString, getUserForEmail, getUrlsForUserId } = require('./helpers');
 const { RANDOM_STR_LENGTH, SERVER_PORT, HTTP_STATUS,
   APP_URLS, RESOURCES, users, urlDbObj } = require('./constants');
 
 // Init Express app
 const app = express();
+// middleware inits
 app.use(favicon(RESOURCES.favicon));
 app.use(express.static('public'));
 app.use(morgan('dev'));
 
 // Set ejs as view engine
 app.set('view engine', 'ejs');
+app.use(express.urlencoded({ extended: true }));
 
-// middleware inits
 app.use(cookieSession({
   name: 'TinyU_session',
   keys: [ 'secret keys', 'not needed now' ],
 }));
-app.use(express.urlencoded({ extended: true }));
+
+app.use(methodOverride('_method'));
 
 // Validate login session
 const validateLoginSession = (req, res) => {
@@ -366,7 +370,7 @@ app.get(APP_URLS.shortUrl, (req, res) => {
 });
 
 // POST /urls/:shortURL : Update the long url of a given short url
-app.post(APP_URLS.shortUrl, (req, res) => {
+app.put(APP_URLS.shortUrl, (req, res) => {
 
   // validate the current user session
   if (validateLoginSession(req, res) !== true) {
@@ -409,8 +413,10 @@ app.post(APP_URLS.shortUrl, (req, res) => {
   res.redirect(HTTP_STATUS.REDIRECT, shortURL);
 });
 
-// DELETE a url entry having given shortURL
-app.post(APP_URLS.deleteUrl, (req, res) => {
+// DELETE /urls/:shortURL/delete - a url entry having given shortURL
+// DELETE /urls/:shortURL?_method=DELETE
+app.delete(APP_URLS.deleteUrl, (req, res) => {
+
   // validate the current user session
   if (validateLoginSession(req, res) !== true) {
     // response is alredy sent in case of error

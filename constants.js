@@ -23,7 +23,7 @@ const APP_URLS = {
   urls: '/urls',
   shortUrl: '/urls/:shortURL',
   urlsNew: "/urls/new",
-  deleteUrl: "/urls/:shortURL/delete",
+  deleteUrl: "/urls/:shortURL", // "/urls/:shortURL/delete",
   uShortURL: "/u/:shortURL",
   favicon: '/favicon.ico',
 
