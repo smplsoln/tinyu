@@ -1,12 +1,15 @@
 <header>
   <nav class="navbar navbar-expand-md navbar-dark bg-success">
 
+    <div class="logo-image">
+      <img src="/images/tinyu.png" alt="" width="35" height="35">
+    </div>
     <a class="navbar-brand" href="/urls">TinyU</a>
 
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup"
-      aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
+    aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
 
     <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
       <div class="navbar-nav">
@@ -15,18 +18,10 @@
       </div class="container float-right">
     </div>
 
-    <% if (username) { %>
       <form action="/logout" method="POST">
           <h2 class="navbar-brand">Welcome, <%= username %> ! </h2>
           <button type="submit" class="btn btn-outline-dark">Logout</button>
       </form>
-    <% } else { %>
-      <form class="form-inline" action="/login" method="POST">
-        <label for="username">Username:</label>
-        <input class="form-control" type="text" name="username" placeholder="username" style="width: 150px; margin: 1em">
-        <button type="submit" class="btn btn-outline-dark">Login</button>
-      </form>
-    <% } %>
 
   </nav>
 </header>

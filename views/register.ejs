@@ -1,0 +1,36 @@
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css"
+    integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
+  <title>TinyU</title>
+  <%- include('partials/_loginregheader') %>
+</head>
+
+<body>
+    <div class="d-flex justify-content-center ">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title">New User Registeration</h5>
+          <h9>Already registered? <a href="/login">Login instead!</a></h9>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="/register">
+            <label for="inputName" class="sr-only">Your Name</label>
+            <input required name="name" type=name placeholder="Your Name" class="form-control"/>
+            <br/>
+            <label for="inputEmail" class="sr-only">Your Email Address</label>
+            <input required name="email" type=email placeholder="Your Email address" class="form-control"/>
+            <br/>
+            <label for="inputPassword" class="sr-only">Your Password</label>
+            <input required name="password" type=password placeholder="Your desired password" class="form-control"/>
+            <br/>
+            <button type="submit" class="btn btn-primary">Register!</button>
+          </form>
+        </div>
+      </div>
+    </div>
+</body>
+</html>
