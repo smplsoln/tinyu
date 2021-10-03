@@ -5,7 +5,7 @@
   <!-- Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css"
     integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
-  <title>TinyU</title>
+  <title>TinyU Register User</title>
   <%- include('partials/_loginregheader') %>
 </head>
 
@@ -13,7 +13,14 @@
     <div class="d-flex justify-content-center ">
       <div class="card">
         <div class="card-header">
-          <h5 class="card-title">New User Registeration</h5>
+          <% if (err.length > 0) { %>
+            <h5 class="card-title">Please provide valid details to register</h5>
+            <div class="alert alert-danger" role="alert">
+              <h6><%= err %></h6>
+            </div>
+          <% } else { %>
+              <h5 class="card-title">New User Registeration</h5>
+          <% } %>
           <h9>Already registered? <a href="/login">Login instead!</a></h9>
         </div>
         <div class="card-body">

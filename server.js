@@ -1,65 +1,16 @@
+/**
+ * TinyU Server JS containing all the app server logic
+ */
+
 // module imports
 const express = require('express');
-// const path = require('path');
 const favicon = require('serve-favicon');
 const morgan = require('morgan');
 const bcrypt = require('bcryptjs');
-// const cookieParser = require('cookie-parser');
 const cookieSession = require('cookie-session');
-const helpers = require('./helpers');
-const generateRandomString = helpers.generateRandomString;
-const getUserForEmail = helpers.getUserForEmail;
-
-// CONSTANTS
-const RANDOM_STR_LENGTH = 6;
-const SERVER_PORT = 3000;
-const USER_ID = 'userId';
-const COOKIES = {
-  USER_ID: USER_ID
-};
-const HTTP_STATUS = {
-  GET_OK: 200,
-  CREATED: 201,
-  ACCEPTED: 202,
-  REDIRECT: 302,
-  BAD_REQUEST: 400,
-  UNAUTHORIZED: 401,
-  FORBIDDEN: 403
-};
-const APP_URLS = {
-  home: '/',
-  login: '/login',
-  register: '/register',
-  logout: '/logout',
-  urls: '/urls',
-  shortUrl: '/urls/:shortURL',
-  urlsNew: "/urls/new",
-  deleteUrl: "/urls/:shortURL/delete",
-  uShortURL: "/u/:shortURL",
-  favicon: '/favicon.ico',
-
-  catchAll: '*'
-};
-
-const RESOURCES = {
-  favicon: './public/images/favicon.ico'
-};
-
-const users = {
-  "userId1": {
-    id: "userId1",
-    name: "Iron Man",
-    email: "user1@example.com",
-    password: "123"
-  }
-};
-
-const urlDbObj = {
-  b6UTxQ: {
-    longURL: "https://www.tsn.ca",
-    userID: "aJ48lW"
-  }
-};
+const { generateRandomString, getUserForEmail, getUrlsForUserId } = require('./helpers');
+const { RANDOM_STR_LENGTH, SERVER_PORT, HTTP_STATUS,
+  APP_URLS, RESOURCES, users, urlDbObj } = require('./constants');
 
 // Init Express app
 const app = express();
@@ -71,20 +22,39 @@ app.use(morgan('dev'));
 app.set('view engine', 'ejs');
 
 // middleware inits
-// app.use(cookieParser());
 app.use(cookieSession({
   name: 'TinyU_session',
   keys: [ 'secret keys', 'not needed now' ],
-  // Cookie Options
-  // maxAge: 24 * 60 * 60 * 1000 // 24 hours
 }));
 app.use(express.urlencoded({ extended: true }));
+
+// Validate login session
+const validateLoginSession = (req, res) => {
+  const userId = req.session.userId;
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!userId) {
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .render('login', { err: 'Error: Not logged in!' });
+  }
+
+  const user = users[userId];
+  // if the userId cookie is not already set
+  // then the usser is not authenticated
+  if (!user) {
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .render('login', { err: 'Error: Not logged in!' });
+  }
+  // validation successful
+  return true;
+};
 
 // response-handler mappings
 
 // register new user
 app.get(APP_URLS.register, (req, res) => {
-  res.render('register');
+  res.status(HTTP_STATUS.OK)
+    .render('register', {err: ""});
 });
 
 app.post(APP_URLS.register, (req, res) => {
@@ -97,15 +67,20 @@ app.post(APP_URLS.register, (req, res) => {
   // check name, email and password was submitted
   if (!email || !password || !name) {
     return res.status(HTTP_STATUS.BAD_REQUEST)
-      .send('Name, email and password cannot be blank!');
+      .render('register', { err: 'Error: Name, email and password cannot be blank!' });
+  }
+
+  if (email.indexOf('@') === -1 || email.indexOf('.') === -1) {
+    // Keeping the error msg generic for safety
+    return res.status(HTTP_STATUS.BAD_REQUEST)
+      .render('register', { err: 'Error: Invald name or email or password!' });
   }
 
   // Check if user already exists for this email
   if (getUserForEmail(email, users)) {
     return res.status(HTTP_STATUS.FORBIDDEN)
-      .redirect(APP_URLS.register);
+      .render('register', {err: "Error: Invalid registration details!"});
   }
-
 
   // hash the user's password
   bcrypt.genSalt(10, (err, salt) => {
@@ -119,60 +94,59 @@ app.post(APP_URLS.register, (req, res) => {
         password: hash
       };
 
-      console.log(users);
-      res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.login);
+      res.status(HTTP_STATUS.ACCEPTED)
+        .render('login', {err: ""});
     });
   });
 });
 
 // Login
 app.get(APP_URLS.login, (req, res) => {
-  res.render('login');
+  res.status(HTTP_STATUS.OK)
+    .render('login', {err: ""});
 });
 
 // process login and set user_id cookie
 app.post(APP_URLS.login, (req, res) => {
 
   const body = req.body;
-  console.log({body});
-
   const email = body.email;
   const password = body.password;
 
   // check email and password was submitted
   if (!email || !password) {
     return res.status(HTTP_STATUS.FORBIDDEN)
-      .send('email and password cannot be blank');
+      .render('login', { err: 'Error: Email and password cannot be blank!' });
   }
 
   // get the user info for this email
   let user = getUserForEmail(email, users);
 
-  // no  user with this email address
+  // no user with this email address
   if (!user) {
-    console.log({user});
+    // Purposefully keeping the error message brief and generic for safety
     return res.status(HTTP_STATUS.FORBIDDEN)
-      .redirect(APP_URLS.login);
+      .render('login', { err: 'Error: Invalid email or password!' });
   }
 
   // compare the stored password hash with the user provided password
   bcrypt.compare(password, user.password, (err, result) => {
     if (!result) {
       // password does not match
-      console.log({result});
       return res.status(HTTP_STATUS.FORBIDDEN)
-        .redirect(APP_URLS.login);
+        .render('login', { err: 'Error: Email and password should be correct!' });
     }
 
     if (err) {
-      console.log({err});
-      return res.status(HTTP_STATUS.FORBIDDEN).send('Error during authentication!');
+      // Such error during bcrypt is never expected
+      // So logging the error, but not sending it to user for safety
+      console.error({err});
+      return res.status(HTTP_STATUS.FORBIDDEN)
+        .render('login', { err: 'Error during authentication!' });
     }
 
-    console.log(`User Authenticated!`);
     // User authenticated successfully
     // redirect the user
-    // res.cookie(COOKIES.USER_ID, user.id)
     req.session.userId = user.id;
     res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
   });
@@ -180,140 +154,162 @@ app.post(APP_URLS.login, (req, res) => {
 
 // process logout and set username cookie
 app.post(APP_URLS.logout, (req, res) => {
-
   req.session = null;
-
-  res.status(HTTP_STATUS.CREATED)
-    // .clearCookie(COOKIES.USER_ID)
-    .redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
+  res.status(HTTP_STATUS.OK)
+    .render('login', { err: "" });
 });
 
-// GET /home handler
+// GET / handler
 app.get(APP_URLS.home, (req, res) => {
-  res.status(HTTP_STATUS.GET_OK)
-    .send(`Thanks for visiting TinyU "${req.url}"`);
-});
-
-// GET /urls
-app.get(APP_URLS.urls, (req, res) => {
-
-  const userId = req.session.userId; // req.cookies[COOKIES.USER_ID];
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!userId) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  // validate the current user session
+  if (validateLoginSession(req, res) !== true) {
+    // response is alredy sent in case of error
+    // else true is returned, so this is a
+    // precautionary return in case of false
+    return;
   }
-
+  const userId = req.session.userId;
   const user = users[userId];
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!user) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
 
-  const urlsForUser = {};
+  // Find the url records for the user
+  const urlsForUser = getUrlsForUserId(userId, urlDbObj);
 
-  for (const short of Object.keys(urlDbObj)) {
-    const urlObj = urlDbObj[short];
-    if (urlObj.userId === userId) {
-      urlsForUser[short] = urlObj;
-    }
-  }
-
+  // Render the urls table
   const username = `${user.name} (${user.email})`;
   const templateVars = {
     urls: urlsForUser,
-    username: username
+    username: username,
+    err: ""
   };
-  res.render("urls_index", templateVars);
+  res.status(HTTP_STATUS.OK)
+    .render("urls_index", templateVars);
 });
 
-app.get(APP_URLS.urlsNew, (req, res) => {
-  // const userId = req.cookies[COOKIES.USER_ID];
+
+// GET /urls : list the urls for the current user
+app.get(APP_URLS.urls, (req, res) => {
+
+  // Validate user login session
+  if (validateLoginSession(req, res) !== true) {
+    // response is alredy sent in case of error
+    // else true is returned, so this is a
+    // precautionary return in case of false
+    return;
+  }
+
   const userId = req.session.userId;
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!userId) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
-
   const user = users[userId];
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!user) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
 
+  // Find the url records for the user
+  const urlsForUser = getUrlsForUserId(userId, urlDbObj);
+
+  // Render the urls table
   const username = `${user.name} (${user.email})`;
   const templateVars = {
-    // urls: urlDbObj,
-    username: username
+    urls: urlsForUser,
+    username: username,
+    err: ""
+  };
+  res.status(HTTP_STATUS.OK)
+    .render("urls_index", templateVars);
+});
+
+
+app.get(APP_URLS.urlsNew, (req, res) => {
+
+  // validate the current user session
+  if (validateLoginSession(req, res) !== true) {
+    // response is alredy sent in case of error
+    // else true is returned, so this is a
+    // precautionary return in case of false
+    return;
+  }
+
+  const userId = req.session.userId;
+  const user = users[userId];
+
+  // Create header display name string based on current usre record
+  const username = `${user.name} (${user.email})`;
+  const templateVars = {
+    username: username,
+    err: ""
   };
 
-  res.render("urls_new", templateVars);
+  res.status(HTTP_STATUS.OK)
+    .render("urls_new", templateVars);
 });
 
 // POST : Add a new URL entry
 app.post(APP_URLS.urls, (req, res) => {
 
-  // const userId = req.cookies[COOKIES.USER_ID];
+  // validate the current user session
+  if (validateLoginSession(req, res) !== true) {
+    // response is alredy sent in case of error
+    // else true is returned, so this is a
+    // precautionary return in case of false
+    return;
+  }
+
   const userId = req.session.userId;
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!userId) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
-
-  const user = users[userId];
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!user) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
-
   const longURL = req.body.longURL;
-  console.log({longURL});
+
   if (!longURL || longURL === "") {
-    return res.redirect(HTTP_STATUS.BAD_REQUEST, APP_URLS.urls);
+    const user = users[userId];
+    const username = `${user.name} (${user.email})`;
+    const templateVars = {
+      username: username,
+      err: "Error: Invalid URL input!"
+    };
+    return res.status(HTTP_STATUS.BAD_REQUEST)
+      .render("urls_new", templateVars);
   }
 
-  let rndmStrId = generateRandomString(RANDOM_STR_LENGTH);
-  urlDbObj[rndmStrId] = {
+  let newUrlId = generateRandomString(RANDOM_STR_LENGTH);
+  urlDbObj[newUrlId] = {
     userId: userId,
     longURL: longURL
   };
 
-  let shortURL = APP_URLS.urls + '/' + rndmStrId;
+  let shortURL = APP_URLS.urls + '/' + newUrlId;
   res.redirect(HTTP_STATUS.REDIRECT, shortURL);
 });
 
 //POST /urls/:shortURL : Update the long url of a given short url
 app.post(APP_URLS.shortUrl, (req, res) => {
-  // const userId = req.cookies[COOKIES.USER_ID];
+
+  // validate the current user session
+  if (validateLoginSession(req, res) !== true) {
+    // response is alredy sent in case of error
+    // else true is returned, so this is a
+    // precautionary return in case of false
+    return;
+  }
+
   const userId = req.session.userId;
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!userId) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
-
   const user = users[userId];
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!user) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
-
   let shortURL = req.params.shortURL;
   const urlObj = urlDbObj[shortURL];
+
+  // If there is no entry for the shortURL or
+  // the url entry belongs to another user
+  // ask the user to login properly
+  // posibility of impersonation
   if (!urlObj || urlObj.userId !== userId) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .render('login', { err: 'Error: Invalid user information!' });
   }
 
   const longURL = req.body.longURL;
-  console.log({longURL});
   if (!longURL || longURL === "") {
-    return res.redirect(HTTP_STATUS.BAD_REQUEST, APP_URLS.urls);
+    const username = `${user.name} (${user.email})`;
+    const templateVars = {
+      shortURL: shortURL,
+      longURL: urlObj.longURL,
+      username: username,
+      err: "Error: Invalid long URL!"
+    };
+    return res.status(HTTP_STATUS.BAD_REQUEST)
+      .render("urls_show", templateVars);
   }
 
   urlDbObj[shortURL].longURL = longURL;
@@ -323,23 +319,33 @@ app.post(APP_URLS.shortUrl, (req, res) => {
 
 //DELETE a url entry having given shortURL
 app.post(APP_URLS.deleteUrl, (req, res) => {
-  // const userId = req.cookies[COOKIES.USER_ID];
+  // validate the current user session
+  if (validateLoginSession(req, res) !== true) {
+    // response is alredy sent in case of error
+    // else true is returned, so this is a
+    // precautionary return in case of false
+    return;
+  }
   const userId = req.session.userId;
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!userId) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
-
   const user = users[userId];
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!user) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
   let surl = req.params.shortURL;
 
+  // The current user doesnt own this url entry
+  // so show error and redirect to
+  if (userId !== urlDbObj[surl].userId) {
+    // Render the urls table
+    const urlsForUser = getUrlsForUserId(userId, urlDbObj);
+    const username = `${user.name} (${user.email})`;
+    const templateVars = {
+      urls: urlsForUser,
+      username: username,
+      err: "Error: URL does not belong to user for delete!"
+    };
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .render("urls_index", templateVars);
+  }
 
+  // All good, delete the url
   delete urlDbObj[surl];
   res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
 });
@@ -347,34 +353,25 @@ app.post(APP_URLS.deleteUrl, (req, res) => {
 
 // /urls/:id show the longURL details for the given shortURL
 app.get(APP_URLS.shortUrl, (req, res) => {
-  // const userId = req.cookies[COOKIES.USER_ID];
   const userId = req.session.userId;
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!userId) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
-
   const user = users[userId];
-  // if the userId cookie is not already set
-  // then the usser is not authenticated
-  if (!user) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
-  }
 
   const shortURL = req.params.shortURL;
   const urlObj = urlDbObj[shortURL];
   if (urlObj.userId !== userId) {
-    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .render('login', { err: 'Error: URL does not belong to user!' });
   }
 
   const username = `${user.name} (${user.email})`;
   const templateVars = {
     shortURL: shortURL,
     longURL: urlObj.longURL,
-    username: username
+    username: username,
+    err: ""
   };
-  res.render("urls_show", templateVars);
+  res.status(HTTP_STATUS.OK)
+    .render("urls_show", templateVars);
 });
 
 // redirect to the longURL for the given shortURL
@@ -388,11 +385,18 @@ app.get(APP_URLS.uShortURL, (req, res) => {
 
 // catch-all for unknown resource links
 app.get(APP_URLS.catchAll, (req, res) => {
+  // validate the current user session
+  if (validateLoginSession(req, res) !== true) {
+    // response is alredy sent in case of error
+    // else true is returned, so this is a
+    // precautionary return in case of false
+    return;
+  }
   res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.home);
-  // res.redirect(APP_URLS.home);
 });
 
 // start app webserver
 app.listen(SERVER_PORT, () => {
   console.log(`TinyU app is listening on SERVER_PORT ${SERVER_PORT}`);
 });
+

@@ -5,7 +5,7 @@
   <!-- Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css"
     integrity="sha384-GJzZqFGwb1QTTN6wy59ffF1BuGJpLSa9DkKMp0DgiMDm4iYMj70gZWKYbI706tWS" crossorigin="anonymous">
-  <title>URL - TinyU Example</title>
+  <title>TinyU URL Details</title>
   <%- include('partials/_header') %>
 </head>
 
@@ -23,6 +23,12 @@
     <div class="card-body">
       <form class="form-inline justify-content-center" action="/urls/<%= shortURL %>" method="POST">
         <div class="form-group mb-2">
+          <% if (err.length > 0) { %>
+            <h5 class="card-title">Please provide valid URL to update</h5>
+            <div class="alert alert-danger" role="alert">
+              <h6><%= err %></h6>
+            </div>
+          <% } %>
           <label for="longURL">New URL:</label>
           <input required class="form-control" type="text" name="longURL" placeholder="http://" style="width: 300px; margin: 1em">
           <button type="submit" class="btn btn-primary">update</button>
