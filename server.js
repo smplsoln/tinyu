@@ -220,9 +220,10 @@ app.get(APP_URLS.urls, (req, res) => {
     }
   }
 
+  const username = `${user.name} (${user.email})`;
   const templateVars = {
     urls: urlsForUser,
-    username: user.name
+    username: username
   };
   res.render("urls_index", templateVars);
 });
@@ -243,9 +244,10 @@ app.get(APP_URLS.urlsNew, (req, res) => {
     return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
   }
 
+  const username = `${user.name} (${user.email})`;
   const templateVars = {
     // urls: urlDbObj,
-    username: user.name
+    username: username
   };
 
   res.render("urls_new", templateVars);
@@ -366,10 +368,11 @@ app.get(APP_URLS.shortUrl, (req, res) => {
     return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
   }
 
+  const username = `${user.name} (${user.email})`;
   const templateVars = {
     shortURL: shortURL,
     longURL: urlObj.longURL,
-    username: user.name
+    username: username
   };
   res.render("urls_show", templateVars);
 });
