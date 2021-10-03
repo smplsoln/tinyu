@@ -4,12 +4,13 @@ const express = require('express');
 const favicon = require('serve-favicon');
 const morgan = require('morgan');
 const bcrypt = require('bcryptjs');
-const cookieParser = require('cookie-parser');
+// const cookieParser = require('cookie-parser');
+const cookieSession = require('cookie-session');
 
 // CONSTANTS
 const RANDOM_STR_LENGTH = 6;
 const SERVER_PORT = 3000;
-const USER_ID = 'user_id';
+const USER_ID = 'userId';
 const COOKIES = {
   USER_ID: USER_ID
 };
@@ -87,7 +88,13 @@ app.use(morgan('dev'));
 app.set('view engine', 'ejs');
 
 // middleware inits
-app.use(cookieParser());
+// app.use(cookieParser());
+app.use(cookieSession({
+  name: 'TinyU_session',
+  keys: [ 'secret keys', 'not needed now' ],
+  // Cookie Options
+  // maxAge: 24 * 60 * 60 * 1000 // 24 hours
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // response-handler mappings
@@ -182,15 +189,19 @@ app.post(APP_URLS.login, (req, res) => {
     console.log(`User Authenticated!`);
     // User authenticated successfully
     // redirect the user
-    res.cookie(COOKIES.USER_ID, user.id)
-      .redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
+    // res.cookie(COOKIES.USER_ID, user.id)
+    req.session.userId = user.id;
+    res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
   });
 });
 
 // process logout and set username cookie
 app.post(APP_URLS.logout, (req, res) => {
+
+  req.session = null;
+
   res.status(HTTP_STATUS.CREATED)
-    .clearCookie(COOKIES.USER_ID)
+    // .clearCookie(COOKIES.USER_ID)
     .redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
 });
 
@@ -203,7 +214,7 @@ app.get(APP_URLS.home, (req, res) => {
 // GET /urls
 app.get(APP_URLS.urls, (req, res) => {
 
-  const userId = req.cookies[COOKIES.USER_ID];
+  const userId = req.session.userId; // req.cookies[COOKIES.USER_ID];
   // if the userId cookie is not already set
   // then the usser is not authenticated
   if (!userId) {
@@ -234,7 +245,8 @@ app.get(APP_URLS.urls, (req, res) => {
 });
 
 app.get(APP_URLS.urlsNew, (req, res) => {
-  const userId = req.cookies[COOKIES.USER_ID];
+  // const userId = req.cookies[COOKIES.USER_ID];
+  const userId = req.session.userId;
   // if the userId cookie is not already set
   // then the usser is not authenticated
   if (!userId) {
@@ -259,7 +271,8 @@ app.get(APP_URLS.urlsNew, (req, res) => {
 // POST : Add a new URL entry
 app.post(APP_URLS.urls, (req, res) => {
 
-  const userId = req.cookies[COOKIES.USER_ID];
+  // const userId = req.cookies[COOKIES.USER_ID];
+  const userId = req.session.userId;
   // if the userId cookie is not already set
   // then the usser is not authenticated
   if (!userId) {
@@ -291,7 +304,8 @@ app.post(APP_URLS.urls, (req, res) => {
 
 //POST /urls/:shortURL : Update the long url of a given short url
 app.post(APP_URLS.shortUrl, (req, res) => {
-  const userId = req.cookies[COOKIES.USER_ID];
+  // const userId = req.cookies[COOKIES.USER_ID];
+  const userId = req.session.userId;
   // if the userId cookie is not already set
   // then the usser is not authenticated
   if (!userId) {
@@ -324,7 +338,8 @@ app.post(APP_URLS.shortUrl, (req, res) => {
 
 //DELETE a url entry having given shortURL
 app.post(APP_URLS.deleteUrl, (req, res) => {
-  const userId = req.cookies[COOKIES.USER_ID];
+  // const userId = req.cookies[COOKIES.USER_ID];
+  const userId = req.session.userId;
   // if the userId cookie is not already set
   // then the usser is not authenticated
   if (!userId) {
@@ -347,7 +362,8 @@ app.post(APP_URLS.deleteUrl, (req, res) => {
 
 // /urls/:id show the longURL details for the given shortURL
 app.get(APP_URLS.shortUrl, (req, res) => {
-  const userId = req.cookies[COOKIES.USER_ID];
+  // const userId = req.cookies[COOKIES.USER_ID];
+  const userId = req.session.userId;
   // if the userId cookie is not already set
   // then the usser is not authenticated
   if (!userId) {
