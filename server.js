@@ -55,9 +55,20 @@ const users = {
   }
 };
 
-const urlDbObj = {
+/* const urlDbObj = {
   "b2xVn2": "http://www.lighthouselabs.ca",
   "9sm5xK": "http://www.google.com"
+}; */
+
+const urlDbObj = {
+  b6UTxQ: {
+    longURL: "https://www.tsn.ca",
+    userID: "aJ48lW"
+  },
+  i3BoGr: {
+    longURL: "https://www.google.ca",
+    userID: "aJ48lW"
+  }
 };
 
 // Generate random string
@@ -139,8 +150,6 @@ app.get(APP_URLS.login, (req, res) => {
 app.post(APP_URLS.login, (req, res) => {
 
   const body = req.body;
-  console.log(req.body);
-
   const email = body.email;
   const password = body.password;
 
@@ -223,7 +232,7 @@ app.get(APP_URLS.urlsNew, (req, res) => {
   }
 
   const templateVars = {
-    urls: urlDbObj,
+    // urls: urlDbObj,
     username: user.name
   };
 
@@ -247,8 +256,18 @@ app.post(APP_URLS.urls, (req, res) => {
     return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
   }
 
+  const longURL = req.body.longURL;
+  console.log({longURL});
+  if (!longURL || longURL === "") {
+    return res.redirect(HTTP_STATUS.BAD_REQUEST, APP_URLS.urls);
+  }
+
   let rndmStrId = generateRandomString(RANDOM_STR_LENGTH);
-  urlDbObj[rndmStrId] = req.body.longURL;
+  urlDbObj[rndmStrId] = {
+    userId: userId,
+    longURL: longURL
+  };
+
   let shortURL = APP_URLS.urls + '/' + rndmStrId;
   res.redirect(HTTP_STATUS.REDIRECT, shortURL);
 });
@@ -268,9 +287,21 @@ app.post(APP_URLS.shortUrl, (req, res) => {
   if (!user) {
     return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
   }
-  let surl = req.params.shortURL;
-  urlDbObj[surl] = req.body.longURL;
-  let shortURL = APP_URLS.urls + '/' + surl;
+
+  let shortURL = req.params.shortURL;
+  const urlObj = urlDbObj[shortURL];
+  if (!urlObj || urlObj.userId !== userId) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
+  const longURL = req.body.longURL;
+  console.log({longURL});
+  if (!longURL || longURL === "") {
+    return res.redirect(HTTP_STATUS.BAD_REQUEST, APP_URLS.urls);
+  }
+
+  urlDbObj[shortURL].longURL = longURL;
+  shortURL = APP_URLS.urls + '/' + shortURL;
   res.redirect(HTTP_STATUS.REDIRECT, shortURL);
 });
 
@@ -290,6 +321,8 @@ app.post(APP_URLS.deleteUrl, (req, res) => {
     return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
   }
   let surl = req.params.shortURL;
+
+
   delete urlDbObj[surl];
   res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
 });
@@ -311,9 +344,15 @@ app.get(APP_URLS.shortUrl, (req, res) => {
     return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
   }
 
+  const shortURL = req.params.shortURL;
+  const urlObj = urlDbObj[shortURL];
+  if (urlObj.userId !== userId) {
+    return res.status(HTTP_STATUS.FORBIDDEN).redirect(APP_URLS.login);
+  }
+
   const templateVars = {
-    shortURL: req.params.shortURL,
-    longURL: `${urlDbObj[req.params.shortURL]}`,
+    shortURL: shortURL,
+    longURL: urlObj.longURL,
     username: user.name
   };
   res.render("urls_show", templateVars);
@@ -321,7 +360,7 @@ app.get(APP_URLS.shortUrl, (req, res) => {
 
 // redirect to the longURL for the given shortURL
 app.get(APP_URLS.uShortURL, (req, res) => {
-  let longURL = urlDbObj[req.params.shortURL];
+  let longURL = `${urlDbObj[req.params.shortURL].longURL}`;
   if (!longURL) {
     longURL = APP_URLS.home;
   }
