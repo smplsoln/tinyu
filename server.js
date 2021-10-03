@@ -3,6 +3,7 @@ const express = require('express');
 // const path = require('path');
 const favicon = require('serve-favicon');
 const morgan = require('morgan');
+const bcrypt = require('bcryptjs');
 const cookieParser = require('cookie-parser');
 
 // CONSTANTS
@@ -46,27 +47,12 @@ const users = {
     name: "Iron Man",
     email: "user1@example.com",
     password: "123"
-  },
-  "userId2": {
-    id: "userId2",
-    name: "Black Widow",
-    email: "user2@example.com",
-    password: "234"
   }
 };
-
-/* const urlDbObj = {
-  "b2xVn2": "http://www.lighthouselabs.ca",
-  "9sm5xK": "http://www.google.com"
-}; */
 
 const urlDbObj = {
   b6UTxQ: {
     longURL: "https://www.tsn.ca",
-    userID: "aJ48lW"
-  },
-  i3BoGr: {
-    longURL: "https://www.google.ca",
     userID: "aJ48lW"
   }
 };
@@ -126,19 +112,27 @@ app.post(APP_URLS.register, (req, res) => {
 
   // Check if user already exists for this email
   if (getUserForEmail(email)) {
-    return res.redirect(HTTP_STATUS.FORBIDDEN, APP_URLS.register);
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .redirect(APP_URLS.register);
   }
 
-  // add new user
-  const newUserId = generateRandomString(3);
-  users[newUserId] = {
-    id: newUserId,
-    name: name,
-    email: email,
-    password: password
-  };
 
-  res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.login);
+  // hash the user's password
+  bcrypt.genSalt(10, (err, salt) => {
+    bcrypt.hash(password, salt, (err, hash) => {
+      // add new user
+      const newUserId = generateRandomString(3);
+      users[newUserId] = {
+        id: newUserId,
+        name: name,
+        email: email,
+        password: hash
+      };
+
+      console.log(users);
+      res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.login);
+    });
+  });
 });
 
 // Login
@@ -150,6 +144,8 @@ app.get(APP_URLS.login, (req, res) => {
 app.post(APP_URLS.login, (req, res) => {
 
   const body = req.body;
+  console.log({body});
+
   const email = body.email;
   const password = body.password;
 
@@ -164,17 +160,31 @@ app.post(APP_URLS.login, (req, res) => {
 
   // no  user with this email address
   if (!user) {
-    return res.redirect(HTTP_STATUS.FORBIDDEN, APP_URLS.login);
+    console.log({user});
+    return res.status(HTTP_STATUS.FORBIDDEN)
+      .redirect(APP_URLS.login);
   }
 
-  // password does not match
-  if (user.password !== password) {
-    return res.redirect(HTTP_STATUS.FORBIDDEN, APP_URLS.login);
-  }
+  // compare the stored password hash with the user provided password
+  bcrypt.compare(password, user.password, (err, result) => {
+    if (!result) {
+      // password does not match
+      console.log({result});
+      return res.status(HTTP_STATUS.FORBIDDEN)
+        .redirect(APP_URLS.login);
+    }
 
-  // User authenticated successfully
-  res.cookie(COOKIES.USER_ID, user.id)
-    .redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
+    if (err) {
+      console.log({err});
+      return res.status(HTTP_STATUS.FORBIDDEN).send('Error during authentication!');
+    }
+
+    console.log(`User Authenticated!`);
+    // User authenticated successfully
+    // redirect the user
+    res.cookie(COOKIES.USER_ID, user.id)
+      .redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
+  });
 });
 
 // process logout and set username cookie
@@ -192,8 +202,6 @@ app.get(APP_URLS.home, (req, res) => {
 
 // GET /urls
 app.get(APP_URLS.urls, (req, res) => {
-  // res.status(HTTP_STATUS.GET_OK).send(`TinyU URLs: "${JSON.stringify(urlDbObj)}"`);
-  // res.status(HTTP_STATUS.GET_OK).json(urlDbObj);
 
   const userId = req.cookies[COOKIES.USER_ID];
   // if the userId cookie is not already set
