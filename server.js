@@ -6,6 +6,9 @@ const morgan = require('morgan');
 const bcrypt = require('bcryptjs');
 // const cookieParser = require('cookie-parser');
 const cookieSession = require('cookie-session');
+const helpers = require('./helpers');
+const generateRandomString = helpers.generateRandomString;
+const getUserForEmail = helpers.getUserForEmail;
 
 // CONSTANTS
 const RANDOM_STR_LENGTH = 6;
@@ -58,26 +61,6 @@ const urlDbObj = {
   }
 };
 
-// Generate random string
-const generateRandomString = (strLen) => {
-  let charSet = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  let charSetLen = charSet.length;
-  let rndmStr = '';
-  for (let i = 0; i < strLen; i++) {
-    rndmStr += charSet.charAt(Math.floor(Math.random() * charSetLen));
-  }
-  return rndmStr;
-};
-
-const getUserForEmail = (emailAddr) => {
-  for (const uid of Object.keys(users)) {
-    if (users[uid].email === emailAddr) {
-      return users[uid];
-    }
-  }
-  return false;
-};
-
 // Init Express app
 const app = express();
 app.use(favicon(RESOURCES.favicon));
@@ -118,7 +101,7 @@ app.post(APP_URLS.register, (req, res) => {
   }
 
   // Check if user already exists for this email
-  if (getUserForEmail(email)) {
+  if (getUserForEmail(email, users)) {
     return res.status(HTTP_STATUS.FORBIDDEN)
       .redirect(APP_URLS.register);
   }
@@ -163,7 +146,7 @@ app.post(APP_URLS.login, (req, res) => {
   }
 
   // get the user info for this email
-  let user = getUserForEmail(email);
+  let user = getUserForEmail(email, users);
 
   // no  user with this email address
   if (!user) {
