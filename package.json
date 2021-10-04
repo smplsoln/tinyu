@@ -6,7 +6,7 @@
   "scripts": {
     "test": "./node_modules/mocha/bin/mocha",
     "node_start": "node server.js",
-    "start": "./node_modules/.bin/nodemon -L express_server.js"
+    "start": "./node_modules/.bin/nodemon -L server.js"
   },
   "repository": {
     "type": "git",
