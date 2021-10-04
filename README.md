@@ -14,14 +14,6 @@ TinyU is a full stack web application built with Node and Express that allows us
 
 !["GET URLs Table for My URLS page"](https://github.com/smplsoln/tinyu/blob/master/docs/GET_URLs_Table.png)
 
-!["Login Page"](https://github.com/smplsoln/tinyu/blob/master/docs/LoginPage.png)
-
-!["Login Page Error Invalid email pass"](https://github.com/smplsoln/tinyu/blob/master/docs/LoginPage_Error_Invalid_email_pass.png)
-
-!["Login error msg Invalid email password non existing user email"](https://github.com/smplsoln/tinyu/blob/master/docs/Login_error_msg_Invalid_email_password_non_existing_user_email.png)
-
-!["Login error msg invalid email"](https://github.com/smplsoln/tinyu/blob/master/docs/Login_error_msg_invalid_email.png)
-
 !["URL DetailsPage after adding"](https://github.com/smplsoln/tinyu/blob/master/docs/URL_DetailsPage_after_adding.png)
 
 !["Update/Edit New LongURL into Existing entry "](https://github.com/smplsoln/tinyu/blob/master/docs/Update_Edit_New_LongURL_intoExisting_entry_.png)
@@ -33,6 +25,12 @@ TinyU is a full stack web application built with Node and Express that allows us
 !["Add another URL"](https://github.com/smplsoln/tinyu/blob/master/docs/Add_another_URL.png)
 
 !["URLs table after adding new URL"](https://github.com/smplsoln/tinyu/blob/master/docs/URLs_table_after_adding_new_URL.png)
+
+!["Login Page Error Invalid email pass"](https://github.com/smplsoln/tinyu/blob/master/docs/LoginPage_Error_Invalid_email_pass.png)
+
+!["Login error msg Invalid email password non existing user email"](https://github.com/smplsoln/tinyu/blob/master/docs/Login_error_msg_Invalid_email_password_non_existing_user_email.png)
+
+!["Login error msg invalid email"](https://github.com/smplsoln/tinyu/blob/master/docs/Login_error_msg_invalid_email.png)
 
 ## Dependencies
 
