@@ -10,7 +10,10 @@ const bcrypt = require('bcryptjs');
 const cookieSession = require('cookie-session');
 const methodOverride = require('method-override');
 
-const { generateRandomString, getUserForEmail, getUrlsForUserId } = require('./helpers');
+const { generateRandomString, getUserForEmail,
+  getUrlsForUserId, isValidHttpUrl, validateShortUrl,
+  sendUrlsList, processUrlsList, validateLoginSession } = require('./helpers');
+
 const { RANDOM_STR_LENGTH, SERVER_PORT, HTTP_STATUS,
   APP_URLS, RESOURCES, users, urlDbObj } = require('./constants');
 
@@ -27,89 +30,70 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(cookieSession({
   name: 'TinyU_session',
-  keys: [ 'secret keys', 'not needed now' ],
+  keys: ['secret keys', 'not needed now'],
 }));
 
 app.use(methodOverride('_method'));
 
-// Validate login session
-const validateLoginSession = (req, res) => {
-  const userId = req.session.userId;
-  // if the userId cookie is not already set
-  // then the user is not authenticated
-  if (!userId) {
-    req.session = null;
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render('login', { err: 'Error: Not logged in!' });
-  }
-
-  const user = users[userId];
-  // if the userId cookie is not already set
-  // then the user is not authenticated
-  if (!user) {
-    req.session = null;
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render('login', { err: 'Error: Not logged in!' });
-  }
-  // validation successful
-  return true;
-};
 
 // response-handler mappings
 
-// register new user
+// GET /register : register new user
 app.get(APP_URLS.register, (req, res) => {
 
-  // validate the current user session
+  // GET Register is a special case where the user is not
+  // expected to be present in the server.
+  // So its handling is different to other cases
   const userId = req.session.userId;
   if (!userId) {
-    // userid not set in session
-    // so send registration page
-    return res.status(HTTP_STATUS.OK)
-      .render('register', {err: ""});
+    // userId not set in session so send registration page
+    res.status(HTTP_STATUS.OK).render('register', { err: "" });
+    return;
   }
-  // if the userId cookie is not already set
-  // then the user might already exist
-  // and in a currently authenticated session
+  // if the userId cookie is already set check if user
+  // exists and if in a currently authenticated session
   const user = users[userId];
   if (!user) {
-    // no user exists for this session
-    // userid so send registration page
+    // no user exists for this userId then send registration page
     // after clearing the session data
     req.session = null;
-    return res.status(HTTP_STATUS.OK)
-      .render('register', {err: ""});
+    res.status(HTTP_STATUS.OK).render('register', { err: "" });
+    return;
   }
 
-  // valid session of existing registered user detected
-  // so redireect to urls page
-  res.status(HTTP_STATUS.REDIRECT)
-    .redirect(APP_URLS.urls);
+  // valid session of existing registered user
+  // detected so redirect to urls page
+  res.status(HTTP_STATUS.REDIRECT).redirect(APP_URLS.urls);
 });
 
+// POST /register : Register the new user
 app.post(APP_URLS.register, (req, res) => {
-
   const body = req.body;
   const email = body.email;
   const password = body.password;
   const name = body.name;
 
+  // Validate user inputs
+
   // check name, email and password was submitted
   if (!email || !password || !name) {
-    return res.status(HTTP_STATUS.BAD_REQUEST)
+    res.status(HTTP_STATUS.BAD_REQUEST)
       .render('register', { err: 'Error: Name, email and password cannot be blank!' });
+    return;
   }
 
   if (email.indexOf('@') === -1 || email.indexOf('.') === -1) {
-    // Keeping the error msg generic for safety
-    return res.status(HTTP_STATUS.BAD_REQUEST)
-      .render('register', { err: 'Error: Invald name or email or password!' });
+    res.status(HTTP_STATUS.BAD_REQUEST)
+      .render('register', { err: 'Error: Invalid email!' });
+    return;
   }
 
   // Check if user already exists for this email
   if (getUserForEmail(email, users)) {
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render('register', {err: "Error: Invalid registration details!"});
+    res.status(HTTP_STATUS.FORBIDDEN).render('register', {
+      err: "Error: Invalid registration details! \nUser already registered for this email!"
+    });
+    return;
   }
 
   // hash the user's password
@@ -125,40 +109,33 @@ app.post(APP_URLS.register, (req, res) => {
       };
 
       req.session = null;
-      res.status(HTTP_STATUS.ACCEPTED)
-        .render('login', {err: ""});
+      res.status(HTTP_STATUS.ACCEPTED).render('login', { err: "" });
     });
   });
 });
 
-// Login
+// GET login
 app.get(APP_URLS.login, (req, res) => {
 
-  // validate the current user session
   const userId = req.session.userId;
   if (!userId) {
-    // userid not set in session
-    // so send login page
-    return res.status(HTTP_STATUS.OK)
-      .render('login', {err: ""});
+    // userId not set in session so send login page
+    res.status(HTTP_STATUS.OK).render('login', { err: "" });
+    return;
   }
-  // if the userId cookie is not already set
-  // then the user might already exist
+  // if the userId cookie is not already set then the user might already exist
   // and in a currently authenticated session
   const user = users[userId];
   if (!user) {
-    // no user exists for this session
-    // userid so send login page
-    // after clearing the session data
+    // no user exists for this session userId so send login page
+    // after clearing the possibly stale/cached session data
     req.session = null;
-    return res.status(HTTP_STATUS.OK)
-      .render('login', {err: ""});
+    res.status(HTTP_STATUS.OK).render('login', { err: "" });
+    return;
   }
 
-  // valid session os existing registered user detected
-  // so redireect to urls page
-  res.status(HTTP_STATUS.REDIRECT)
-    .redirect(APP_URLS.urls);
+  // valid session of existing registered user detected so redirect to urls page
+  res.status(HTTP_STATUS.REDIRECT).redirect(APP_URLS.urls);
 });
 
 // process login and set user_id cookie
@@ -171,8 +148,9 @@ app.post(APP_URLS.login, (req, res) => {
   // check email and password was submitted
   if (!email || !password) {
     req.session = null;
-    return res.status(HTTP_STATUS.FORBIDDEN)
+    res.status(HTTP_STATUS.FORBIDDEN)
       .render('login', { err: 'Error: Email and password cannot be blank!' });
+    return;
   }
 
   // get the user info for this email
@@ -181,9 +159,9 @@ app.post(APP_URLS.login, (req, res) => {
   // no user with this email address
   if (!user) {
     req.session = null;
-    // Purposefully keeping the error message brief and generic for safety
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render('login', { err: 'Error: Invalid email or password!' });
+    res.status(HTTP_STATUS.FORBIDDEN)
+      .render('register', { err: 'Error: No user with this email address!' });
+    return;
   }
 
   // compare the stored password hash with the user provided password
@@ -191,136 +169,82 @@ app.post(APP_URLS.login, (req, res) => {
     if (!result) {
       req.session = null;
       // password does not match
-      return res.status(HTTP_STATUS.FORBIDDEN)
-        .render('login', { err: 'Error: Email and password should be correct!' });
+      res.status(HTTP_STATUS.FORBIDDEN)
+        .render('login', { err: 'Error: Invalid Password!' });
+      return;
     }
 
     if (err) {
       // Such error during bcrypt is never expected
       // So logging the error, but not sending it to user for safety
-      console.error({err});
+      console.error({ err });
       req.session = null;
-      return res.status(HTTP_STATUS.FORBIDDEN)
-        .render('login', { err: 'Error during authentication!' });
+      res.status(HTTP_STATUS.FORBIDDEN)
+        .render('login', { err: 'Error during authentication! Enter valid password!' });
+      return;
     }
 
-    // User authenticated successfully
-    // redirect the user
+    // User authenticated successfully redirect the user
     req.session.userId = user.id;
-    res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
+    return res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
   });
 });
 
-// process logout and set username cookie
+// process logout and unset session cookie
 app.post(APP_URLS.logout, (req, res) => {
   req.session = null;
-  res.status(HTTP_STATUS.OK)
-    .render('login', { err: "" });
+  res.status(HTTP_STATUS.OK).render('login', { err: "" });
 });
 
 // GET / handler
 app.get(APP_URLS.home, (req, res) => {
-  // validate the current user session
-  if (validateLoginSession(req, res) !== true) {
-    // response is alredy sent in case of error
-    // else true is returned, so this is a
-    // precautionary return in case of false
-    return;
-  }
-  const userId = req.session.userId;
-  const user = users[userId];
-
-  // Find the url records for the user
-  const urlsForUser = getUrlsForUserId(userId, urlDbObj);
-
-  // Render the urls table
-  const username = `${user.name} (${user.email})`;
-  const templateVars = {
-    urls: urlsForUser,
-    username: username,
-    err: ""
-  };
-  res.status(HTTP_STATUS.OK)
-    .render("urls_index", templateVars);
+  // Process this as a urls list request
+  processUrlsList(req, res);
 });
-
 
 // GET /urls : list the urls for the current user
 app.get(APP_URLS.urls, (req, res) => {
-
-  // Validate user login session
-  if (validateLoginSession(req, res) !== true) {
-    // response is alredy sent in case of error
-    // else true is returned, so this is a
-    // precautionary return in case of false
-    return;
-  }
-
-  const userId = req.session.userId;
-  const user = users[userId];
-
-  // Find the url records for the user
-  const urlsForUser = getUrlsForUserId(userId, urlDbObj);
-
-  // Render the urls table
-  const username = `${user.name} (${user.email})`;
-  const templateVars = {
-    urls: urlsForUser,
-    username: username,
-    err: ""
-  };
-  res.status(HTTP_STATUS.OK)
-    .render("urls_index", templateVars);
+  // process urls list request
+  processUrlsList(req, res);
 });
 
-
+// GET urls addition page
 app.get(APP_URLS.urlsNew, (req, res) => {
 
-  // validate the current user session
-  if (validateLoginSession(req, res) !== true) {
-    // response is alredy sent in case of error
-    // else true is returned, so this is a
-    // precautionary return in case of false
+  if (!validateLoginSession(req, res)) {
     return;
   }
 
   const userId = req.session.userId;
   const user = users[userId];
-
-  // Create header display name string based on current usre record
   const username = `${user.name} (${user.email})`;
   const templateVars = {
     username: username,
     err: ""
   };
 
-  res.status(HTTP_STATUS.OK)
-    .render("urls_new", templateVars);
+  res.status(HTTP_STATUS.OK).render("urls_new", templateVars);
 });
 
 // POST : Add a new URL entry
 app.post(APP_URLS.urls, (req, res) => {
 
-  // validate the current user session
-  if (validateLoginSession(req, res) !== true) {
-    // response is alredy sent in case of error
-    // else true is returned, so this is a
-    // precautionary return in case of false
+  if (!validateLoginSession(req, res)) {
     return;
   }
 
   const userId = req.session.userId;
   const longURL = req.body.longURL;
 
-  if (!longURL || longURL === "") {
+  if (!longURL || longURL === "" || !isValidHttpUrl(longURL)) {
     const user = users[userId];
     const username = `${user.name} (${user.email})`;
     const templateVars = {
       username: username,
       err: "Error: Invalid URL input!"
     };
-    return res.status(HTTP_STATUS.BAD_REQUEST)
-      .render("urls_new", templateVars);
+    res.status(HTTP_STATUS.BAD_REQUEST).render("urls_new", templateVars);
+    return;
   }
 
   let newUrlId = generateRandomString(RANDOM_STR_LENGTH);
@@ -333,31 +257,19 @@ app.post(APP_URLS.urls, (req, res) => {
   res.redirect(HTTP_STATUS.REDIRECT, shortURL);
 });
 
-// GET /urls/:shortURL show the longURL details for the given shortURL
+// GET /urls/:shortURL : show the longURL details for the given shortURL
 app.get(APP_URLS.shortUrl, (req, res) => {
-  // validate the current user session
-  if (validateLoginSession(req, res) !== true) {
-    // response is alredy sent in case of error
-    // else true is returned, so this is a
-    // precautionary return in case of false
+  if (!validateLoginSession(req, res)) {
     return;
   }
-  const userId = req.session.userId;
-  const user = users[userId];
-
   const shortURL = req.params.shortURL;
-  const urlObj = urlDbObj[shortURL];
-  if (!urlObj) {
-    req.session = null;
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render('login', { err: 'Error: URL not found!' });
-  }
-  if (urlObj.userId !== userId) {
-    req.session = null;
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render('login', { err: 'Error: URL does not belong to user!' });
-  }
+  const userId = req.session.userId;
 
+  if (!validateShortUrl(shortURL, userId, res)) {
+    return;
+  }
+  const user = users[userId];
+  const urlObj = urlDbObj[shortURL];
   const username = `${user.name} (${user.email})`;
   const templateVars = {
     shortURL: shortURL,
@@ -365,38 +277,28 @@ app.get(APP_URLS.shortUrl, (req, res) => {
     username: username,
     err: ""
   };
-  res.status(HTTP_STATUS.OK)
-    .render("urls_show", templateVars);
+  res.status(HTTP_STATUS.OK).render("urls_show", templateVars);
 });
 
-// POST /urls/:shortURL : Update the long url of a given short url
+// PUT /urls/:shortURL : Update the long url of a given short url
 app.put(APP_URLS.shortUrl, (req, res) => {
 
-  // validate the current user session
-  if (validateLoginSession(req, res) !== true) {
-    // response is alredy sent in case of error
-    // else true is returned, so this is a
-    // precautionary return in case of false
+  if (!validateLoginSession(req, res)) {
     return;
   }
 
-  const userId = req.session.userId;
-  const user = users[userId];
   let shortURL = req.params.shortURL;
-  const urlObj = urlDbObj[shortURL];
+  const userId = req.session.userId;
 
-  // If there is no entry for the shortURL or
-  // the url entry belongs to another user
-  // ask the user to login properly
-  // posibility of impersonation
-  if (!urlObj || urlObj.userId !== userId) {
-    req.session = null;
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render('login', { err: 'Error: Invalid user information!' });
+  if (!validateShortUrl(shortURL, userId, res)) {
+    return;
   }
 
+  const user = users[userId];
+  const urlObj = urlDbObj[shortURL];
+
   const longURL = req.body.longURL;
-  if (!longURL || longURL === "") {
+  if (!longURL || longURL === "" || !isValidHttpUrl(longURL)) {
     const username = `${user.name} (${user.email})`;
     const templateVars = {
       shortURL: shortURL,
@@ -404,11 +306,11 @@ app.put(APP_URLS.shortUrl, (req, res) => {
       username: username,
       err: "Error: Invalid long URL!"
     };
-    return res.status(HTTP_STATUS.BAD_REQUEST)
-      .render("urls_show", templateVars);
+    res.status(HTTP_STATUS.BAD_REQUEST).render("urls_show", templateVars);
+    return;
   }
 
-  urlDbObj[shortURL].longURL = longURL;
+  urlObj.longURL = longURL;
   shortURL = APP_URLS.urls + '/' + shortURL;
   res.redirect(HTTP_STATUS.REDIRECT, shortURL);
 });
@@ -417,66 +319,49 @@ app.put(APP_URLS.shortUrl, (req, res) => {
 // DELETE /urls/:shortURL?_method=DELETE
 app.delete(APP_URLS.deleteUrl, (req, res) => {
 
-  // validate the current user session
-  if (validateLoginSession(req, res) !== true) {
-    // response is alredy sent in case of error
-    // else true is returned, so this is a
-    // precautionary return in case of false
+  if (!validateLoginSession(req, res)) {
     return;
   }
-  const userId = req.session.userId;
-  const user = users[userId];
-  let surl = req.params.shortURL;
-  const urlObj = urlDbObj[surl];
-  if (!urlObj) {
-    req.session = null;
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render('login', { err: 'Error: URL not found!' });
-  }
 
-  // The current user doesnt own this url entry
-  // so show error and redirect to
-  if (userId !== urlObj.userId) {
-    // Render the urls table
-    const urlsForUser = getUrlsForUserId(userId, urlDbObj);
-    const username = `${user.name} (${user.email})`;
-    const templateVars = {
-      urls: urlsForUser,
-      username: username,
-      err: "Error: URL does not belong to user for delete!"
-    };
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render("urls_index", templateVars);
+  const userId = req.session.userId;
+  let shortURL = req.params.shortURL;
+
+  if (!validateShortUrl(shortURL, userId, res)) {
+    return;
   }
 
   // All good, delete the url
-  delete urlDbObj[surl];
+  delete urlDbObj[shortURL];
   res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
 });
 
-// redirect to the longURL for the given shortURL
+// GET /u/shortURL :redirect to the longURL for the given shortURL
 app.get(APP_URLS.uShortURL, (req, res) => {
+  if (!validateLoginSession(req, res)) {
+    return false;
+  }
   const shortURL = req.params.shortURL;
+  const userId = req.session.userId || "";
   const urlObj = urlDbObj[shortURL];
   if (!urlObj) {
-    req.session = null;
-    return res.status(HTTP_STATUS.FORBIDDEN)
-      .render('login', { err: 'Error: URL not found!' });
+    const errString = `Error: URL ${shortURL} not found!`;
+    sendUrlsList(userId, errString, HTTP_STATUS.BAD_REQUEST, res);
+    return;
   }
+
   let longURL = `${urlObj.longURL}`;
-  if (!longURL) {
-    longURL = APP_URLS.home;
+  if (!longURL || !isValidHttpUrl(longURL)) {
+    const errString = `Error: Not a valid url: "${longURL}", cannot redirect!`;
+    sendUrlsList(userId, errString, HTTP_STATUS.BAD_REQUEST, res);
+    return;
   }
-  res.redirect(longURL);
+
+  res.status(HTTP_STATUS.REDIRECT).redirect(longURL);
 });
 
 // catch-all for unknown resource links
 app.get(APP_URLS.catchAll, (req, res) => {
-  // validate the current user session
-  if (validateLoginSession(req, res) !== true) {
-    // response is alredy sent in case of error
-    // else true is returned, so this is a
-    // precautionary return in case of false
+  if (!validateLoginSession(req, res)) {
     return;
   }
   res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.home);
