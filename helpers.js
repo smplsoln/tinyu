@@ -79,14 +79,19 @@ const getUrlsForUserId = (userId, urlDbObj) => {
 
 
 // Validate login session
-const validateLoginSession = (req, res) => {
+const validateLoginSession = (req, res, showError, errMsg, pageToShow, httpStatusCode) => {
   const userId = req.session.userId;
   // if the userId cookie is not already set
   // then the user is not authenticated, ask to login
   if (!userId) {
     req.session = null;
+    if (showError) {
+      res.status(httpStatusCode).render(pageToShow, { err: errMsg});
+      return;
+    }
+    // req.session.err = 'Error: Not logged in!';
     res.status(HTTP_STATUS.FORBIDDEN)
-      .render('login', { err: 'Error: Not logged in!' });
+      .redirect(APP_URLS.login);
     return false;
   }
 

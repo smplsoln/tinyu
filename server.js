@@ -10,6 +10,7 @@ const bcrypt = require('bcryptjs');
 const cookieSession = require('cookie-session');
 const methodOverride = require('method-override');
 
+
 const { generateRandomString, getUserForEmail,
   getUrlsForUserId, isValidHttpUrl, validateShortUrl,
   sendUrlsList, processUrlsList, validateLoginSession } = require('./helpers');
@@ -32,7 +33,6 @@ app.use(cookieSession({
   name: 'TinyU_session',
   keys: ['secret keys', 'not needed now'],
 }));
-
 app.use(methodOverride('_method'));
 
 
@@ -108,8 +108,8 @@ app.post(APP_URLS.register, (req, res) => {
         password: hash
       };
 
-      req.session = null;
-      res.status(HTTP_STATUS.ACCEPTED).render('login', { err: "" });
+      req.session.userId = newUserId;
+      res.status(HTTP_STATUS.REDIRECT).redirect('url_index');
     });
   });
 });
@@ -138,7 +138,7 @@ app.get(APP_URLS.login, (req, res) => {
   res.status(HTTP_STATUS.REDIRECT).redirect(APP_URLS.urls);
 });
 
-// process login and set user_id cookie
+// POST /login : process login and set user_id cookie
 app.post(APP_URLS.login, (req, res) => {
 
   const body = req.body;
@@ -190,25 +190,32 @@ app.post(APP_URLS.login, (req, res) => {
   });
 });
 
-// process logout and unset session cookie
+// POST /logout : process logout and unset session cookie
 app.post(APP_URLS.logout, (req, res) => {
   req.session = null;
-  res.status(HTTP_STATUS.OK).render('login', { err: "" });
+  res.status(HTTP_STATUS.REDIRECT).redirect(APP_URLS.urls);
 });
 
 // GET / handler
 app.get(APP_URLS.home, (req, res) => {
   // Process this as a urls list request
-  processUrlsList(req, res);
+  if (!validateLoginSession(req, res)) {
+    return false;
+  }
+  res.status(HTTP_STATUS.REDIRECT).redirect(APP_URLS.urls);
 });
 
 // GET /urls : list the urls for the current user
 app.get(APP_URLS.urls, (req, res) => {
+  if (!validateLoginSession(req, res, true,
+    "Error: Not Logged in!", 'login', HTTP_STATUS.FORBIDDEN)) {
+    return;
+  }
   // process urls list request
   processUrlsList(req, res);
 });
 
-// GET urls addition page
+// GET new url addition page
 app.get(APP_URLS.urlsNew, (req, res) => {
 
   if (!validateLoginSession(req, res)) {
@@ -229,10 +236,10 @@ app.get(APP_URLS.urlsNew, (req, res) => {
 // POST : Add a new URL entry
 app.post(APP_URLS.urls, (req, res) => {
 
-  if (!validateLoginSession(req, res)) {
+  if (!validateLoginSession(req, res, true,
+    "Error: Not Logged in!", 'login', HTTP_STATUS.FORBIDDEN)) {
     return;
   }
-
   const userId = req.session.userId;
   const longURL = req.body.longURL;
 
@@ -259,9 +266,12 @@ app.post(APP_URLS.urls, (req, res) => {
 
 // GET /urls/:shortURL : show the longURL details for the given shortURL
 app.get(APP_URLS.shortUrl, (req, res) => {
-  if (!validateLoginSession(req, res)) {
+
+  if (!validateLoginSession(req, res, true,
+    "Error: Not Logged in!", 'login', HTTP_STATUS.FORBIDDEN)) {
     return;
   }
+
   const shortURL = req.params.shortURL;
   const userId = req.session.userId;
 
@@ -283,7 +293,8 @@ app.get(APP_URLS.shortUrl, (req, res) => {
 // PUT /urls/:shortURL : Update the long url of a given short url
 app.put(APP_URLS.shortUrl, (req, res) => {
 
-  if (!validateLoginSession(req, res)) {
+  if (!validateLoginSession(req, res, true,
+    "Error: Not Logged in!", 'login', HTTP_STATUS.FORBIDDEN)) {
     return;
   }
 
@@ -311,18 +322,17 @@ app.put(APP_URLS.shortUrl, (req, res) => {
   }
 
   urlObj.longURL = longURL;
-  shortURL = APP_URLS.urls + '/' + shortURL;
-  res.redirect(HTTP_STATUS.REDIRECT, shortURL);
+  res.redirect(HTTP_STATUS.REDIRECT, APP_URLS.urls);
 });
 
 // DELETE /urls/:shortURL/delete - a url entry having given shortURL
 // DELETE /urls/:shortURL?_method=DELETE
 app.delete(APP_URLS.deleteUrl, (req, res) => {
 
-  if (!validateLoginSession(req, res)) {
+  if (!validateLoginSession(req, res, true,
+    "Error: Not Logged in!", 'login', HTTP_STATUS.FORBIDDEN)) {
     return;
   }
-
   const userId = req.session.userId;
   let shortURL = req.params.shortURL;
 
